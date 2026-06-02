@@ -1895,25 +1895,63 @@
                             salvarEmpresas(empresasAtuais);
                         }
 
-                        let mensagem = '✅ DADOS IMPORTADOS:\n\n';
-                        if (contasAdicionadas > 0) mensagem += `📦 Contas adicionadas: ${contasAdicionadas}\n`;
-                        if (tiposAdicionados > 0) mensagem += `🏷️ Tipos adicionados: ${tiposAdicionados}\n`;
-                        if (fornecedoresAdicionados > 0) mensagem += `🏢 Fornecedores adicionados: ${fornecedoresAdicionados}\n`;
-                        if (empresasAdicionadas > 0) mensagem += `🏭 Empresas adicionadas: ${empresasAdicionadas}\n`;
-                        
-                        if (contasAdicionadas === 0 && tiposAdicionados === 0 && fornecedoresAdicionados === 0 && empresasAdicionadas === 0) {
-                            mensagem = '⚠️ Nenhum dado novo foi adicionado (possível duplicata ou estrutura diferente)';
+                        // Salvar tudo no Supabase em lotes de 400
+                        if (window.sbSalvarItem) {
+                            var todasContas = obterContas();
+                            var todosForn = obterFornecedores();
+                            var todasEmp = obterEmpresas();
+                            var todosTipos = obterTipos();
+
+                            function salvarLoteSupabase(tabela, itens, cb) {
+                                if (!itens.length) { cb(); return; }
+                                var lotes = [];
+                                for (var i=0; i<itens.length; i+=400) lotes.push(itens.slice(i,i+400));
+                                var idx = 0;
+                                function proxLote() {
+                                    if (idx >= lotes.length) { cb(); return; }
+                                    var rows = lotes[idx].map(function(item){ return {id: String(item.id), data: item}; });
+                                    fetch('https://dnacifndejflgxyoqkdd.supabase.co/rest/v1/' + tabela, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuYWNpZm5kZWpmbGd4eW9xa2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTk1NTgsImV4cCI6MjA5NTk5NTU1OH0.rH3tjq_Zq6NG7wygPOERRne1AzL1fRHkzHr7IXOwi9s',
+                                            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuYWNpZm5kZWpmbGd4eW9xa2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTk1NTgsImV4cCI6MjA5NTk5NTU1OH0.rH3tjq_Zq6NG7wygPOERRne1AzL1fRHkzHr7IXOwi9s',
+                                            'Prefer': 'resolution=merge-duplicates'
+                                        },
+                                        body: JSON.stringify(rows)
+                                    }).then(function(){ idx++; proxLote(); }).catch(function(e){ console.error(e); idx++; proxLote(); });
+                                }
+                                proxLote();
+                            }
+
+                            var statusEl = document.getElementById('statusSupa');
+                            if(statusEl) { statusEl.textContent = 'Salvando no Supabase...'; statusEl.style.color='#FFC107'; }
+
+                            salvarLoteSupabase('tipos', todosTipos, function(){
+                                salvarLoteSupabase('fornecedores', todosForn, function(){
+                                    salvarLoteSupabase('empresas', todasEmp, function(){
+                                        salvarLoteSupabase('contas', todasContas, function(){
+                                            if(statusEl) { statusEl.textContent = 'Conectado (' + todasContas.length + ' contas)'; statusEl.style.color='#22C55E'; }
+                                            alert('✅ Importado e salvo no Supabase!\n\nContas: ' + contasAdicionadas + '\nFornecedores: ' + fornecedoresAdicionados + '\nEmpresas: ' + empresasAdicionadas + '\nTipos: ' + tiposAdicionados);
+                                            renderizarDashboard();
+                                            atualizarSelects();
+                                            atualizarFiltroEmpresa();
+                                            renderizarTipos();
+                                            renderizarFornecedores();
+                                            renderizarEmpresas();
+                                        });
+                                    });
+                                });
+                            });
+                        } else {
+                            alert('Importado localmente. Supabase não disponível.');
+                            renderizarDashboard();
+                            atualizarSelects();
+                            atualizarFiltroEmpresa();
+                            renderizarTipos();
+                            renderizarFornecedores();
+                            renderizarEmpresas();
                         }
-                        
-                        mensagem += '\n\n💡 Verifique a aba de Fornecedores e Empresas!';
-                        
-                        alert(mensagem);
-                        renderizarDashboard();
-                        atualizarSelects();
-                        atualizarFiltroEmpresa();
-                        renderizarTipos();
-                        renderizarFornecedores();
-                        renderizarEmpresas();
                     } else {
                         alert('❌ Arquivo deve ser JSON!');
                     }
