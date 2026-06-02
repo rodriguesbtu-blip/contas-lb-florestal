@@ -1,0 +1,2353 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Contas - LB Florestal</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.5.0/pdfmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.5.0/vfs_fonts.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header h1 { font-size: 24px; }
+        .sync-info { font-size: 14px; background: rgba(255,255,255,0.2); padding: 8px 15px; border-radius: 4px; }
+        .tabs {
+            display: flex;
+            background: linear-gradient(90deg, #f5f5f5 0%, #efefef 100%);
+            border-bottom: 3px solid #ddd;
+            flex-wrap: wrap;
+            overflow-x: auto;
+        }
+        .tab-btn {
+            flex: 1;
+            min-width: 100px;
+            padding: 12px;
+            background: #f5f5f5;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.3s;
+            white-space: nowrap;
+            color: #333;
+        }
+        .tab-btn:nth-child(1) { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .tab-btn:nth-child(2) { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
+        .tab-btn:nth-child(3) { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; }
+        .tab-btn:nth-child(4) { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; }
+        .tab-btn:nth-child(5) { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; }
+        .tab-content { display: none; padding: 20px; }
+        .tab-content.active { display: block; }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; margin-bottom: 4px; font-weight: 500; color: #333; font-size: 13px; }
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+        input:focus, select:focus { outline: none; border-color: #667eea; box-shadow: 0 0 5px rgba(102, 126, 234, 0.3); }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+        button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500; }
+        button:hover { transform: translateY(-2px); }
+        .btn-small { padding: 5px 10px; font-size: 11px; margin: 2px; }
+        .btn-delete { background: #e74c3c; }
+        .btn-pagar { background: #27ae60; }
+        .table-responsive { overflow-x: auto; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th { background: #667eea; color: white; padding: 8px; text-align: left; font-weight: 600; }
+        td { padding: 8px; border-bottom: 1px solid #ddd; }
+        tr:hover { background: #f9f9f9; }
+        .currency { color: #27ae60; font-weight: 600; text-align: right; }
+        .status-pago { background: #d4edda; color: #155724; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+        .status-pendente { background: #fff3cd; color: #856404; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+        .dashboard-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 8px; }
+        .card h3 { font-size: 12px; opacity: 0.9; margin-bottom: 8px; }
+        .card .value { font-size: 20px; font-weight: bold; }
+        h2 { color: #333; margin-bottom: 15px; font-size: 18px; }
+        .info-box { background: #f0f7ff; border-left: 4px solid #667eea; padding: 12px; border-radius: 4px; margin-bottom: 15px; font-size: 13px; }
+        .no-data { text-align: center; padding: 20px; color: #999; }
+        .total-row { background: #f0f0f0; font-weight: bold; }
+        .filtros-container { background: #f5f5f5; padding: 15px; border-radius: 4px; margin-bottom: 15px; }
+        .filtro-item { display: inline-block; margin-right: 15px; margin-bottom: 10px; }
+        .filtro-item label { margin-bottom: 2px; }
+        .filtro-item input, .filtro-item select { max-width: 150px; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); overflow-y: auto; }
+        .modal-content { background-color: white; margin: 3% auto; padding: 20px; border-radius: 8px; width: 90%; max-width: 600px; }
+        .modal-header { font-size: 16px; font-weight: bold; margin-bottom: 15px; color: #333; }
+        .close { color: #aaa; float: right; font-size: 28px; cursor: pointer; }
+        .close:hover { color: #000; }
+        .sync-buttons { margin: 20px 0; display: flex; gap: 10px; flex-wrap: wrap; }
+        .sync-buttons button { margin: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>💼 Sistema de Contas a Pagar - LB Florestal</h1>
+                <p>Gerenciamento com Sincronização Manual ✅ v3.5 - Firebase Estável</p>
+            </div>
+            <div class="sync-info">
+                <strong>☁️ Firebase Cloud Sync</strong><br>
+                <span id="statusFirebase" style="font-weight:bold;color:#FFC107;">Conectando...</span>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="mostrarAba('dashboard')">📊 Dashboard</button>
+            <button class="tab-btn" onclick="mostrarAba('adicionar')">📝 Adicionar</button>
+            <button class="tab-btn" onclick="mostrarAba('consultar')">🔍 Consultar</button>
+            <button class="tab-btn" onclick="mostrarAba('relatorios')">📋 Relatórios</button>
+            <button class="tab-btn" onclick="mostrarAba('fluxocaixa')">💰 Fluxo Caixa</button>
+            <button class="tab-btn" onclick="mostrarAba('tipos')">🏷️ Tipos</button>
+            <button class="tab-btn" onclick="mostrarAba('fornecedores')">🏢 Fornecedores</button>
+            <button class="tab-btn" onclick="mostrarAba('empresas')">🏭 Empresas</button>
+            <button class="tab-btn" onclick="mostrarAba('arquivos')">📦 Arquivos</button>
+            <button class="tab-btn" onclick="mostrarAba('sincronizar')">🔄 Sincronizar</button>
+        </div>
+
+        <!-- DASHBOARD -->
+        <div id="dashboard" class="tab-content active">
+            <h2>📊 Dashboard</h2>
+            <div class="dashboard-cards">
+                <div class="card">
+                    <h3>Total de Contas</h3>
+                    <div class="value" id="totalContas">0</div>
+                </div>
+                <div class="card">
+                    <h3>Total em Aberto</h3>
+                    <div class="value" id="totalAberto">R$ 0,00</div>
+                </div>
+                <div class="card">
+                    <h3>Total Pago</h3>
+                    <div class="value" id="totalPago">R$ 0,00</div>
+                </div>
+            </div>
+            <h3>Próximos 15 dias</h3>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Vencimento</th>
+                            <th>Fornecedor</th>
+                            <th>Tipo</th>
+                            <th>Valor</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpoProximos">
+                        <tr><td colspan="5" class="no-data">Nenhuma</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ADICIONAR -->
+        <div id="adicionar" class="tab-content">
+            <h2>📝 Adicionar Conta</h2>
+            <div class="info-box">
+                Preencha os dados da conta. Os dados são salvos localmente no seu navegador.
+            </div>
+            <form onsubmit="adicionarConta(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Empresa *</label>
+                        <select id="selectEmpresa" required>
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Fornecedor *</label>
+                        <select id="selectFornecedor" required>
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tipo *</label>
+                        <select id="tipo" required>
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Número NF *</label>
+                        <input type="text" id="numeroNF" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Valor *</label>
+                        <input type="text" id="valor" placeholder="1000,00" oninput="formatarMoeda(this)" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Vencimento (DD/MM/AAAA) *</label>
+                        <input type="text" id="vencimento" placeholder="DD/MM/AAAA" oninput="formatarData(this)" maxlength="10" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>É Parcelada?</label>
+                        <select id="parcelada" onchange="toggleParcelas()">
+                            <option value="não">Não</option>
+                            <option value="sim">Sim</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="grupoParcelasDiv" style="display: none;">
+                        <label>Qtd de Parcelas</label>
+                        <input type="number" id="numeroParcelas" min="2" placeholder="Ex: 24">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>É Fixa?</label>
+                        <select id="fixa" onchange="toggleRepetir()">
+                            <option value="não">Não</option>
+                            <option value="sim">Sim</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="grupoRepetirDiv" style="display: none;">
+                        <label>Repetir Mensalmente?</label>
+                        <select id="repetirMensalmente">
+                            <option value="não">Não</option>
+                            <option value="1">1 mês</option>
+                            <option value="3">3 meses</option>
+                            <option value="6">6 meses</option>
+                            <option value="12">12 meses</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Observações</label>
+                    <textarea id="observacoes" rows="2"></textarea>
+                </div>
+                <button type="submit" style="width: 100%;">💾 Salvar Conta</button>
+            </form>
+        </div>
+
+        <!-- CONSULTAR -->
+        <div id="consultar" class="tab-content">
+            <h2>🔍 Consultar Contas</h2>
+            <div class="filtros-container">
+                <div class="filtro-item">
+                    <label>De:</label>
+                    <input type="text" id="filtroDataDe" placeholder="DD/MM/AAAA" maxlength="10" oninput="formatarData(this)">
+                </div>
+                <div class="filtro-item">
+                    <label>Até:</label>
+                    <input type="text" id="filtroDataAte" placeholder="DD/MM/AAAA" maxlength="10" oninput="formatarData(this)">
+                </div>
+                <div class="filtro-item">
+                    <label>Empresa:</label>
+                    <select id="filtroEmpresa">
+                        <option value="">Todas</option>
+                    </select>
+                </div>
+                <div class="filtro-item">
+                    <label>Fornecedor:</label>
+                    <select id="filtroFornecedor">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div class="filtro-item">
+                    <label>Tipo:</label>
+                    <select id="filtroTipo">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div class="filtro-item">
+                    <label>Status:</label>
+                    <select id="filtroStatus">
+                        <option value="">Todos</option>
+                        <option value="pago">✓ Pago</option>
+                        <option value="pendente">⏳ Pendente</option>
+                    </select>
+                </div>
+                <div class="filtro-item">
+                    <label>Valor Min:</label>
+                    <input type="text" id="filtroValorMin" placeholder="0,00" oninput="formatarMoeda(this)">
+                </div>
+                <div class="filtro-item">
+                    <label>Valor Max:</label>
+                    <input type="text" id="filtroValorMax" placeholder="999.999,99" oninput="formatarMoeda(this)">
+                </div>
+                <div class="filtro-item">
+                    <button onclick="consultarContas()">🔍 Filtrar</button>
+                    <button onclick="limparFiltros()" style="background: #FF9800;">🔄 Limpar</button>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <span style="font-weight: bold;">📊 Ordenar por:</span>
+                <button onclick="ordenarConsulta('vencimento')" style="padding: 8px 15px; background: #2196F3; color: white; border: none; border-radius: 5px; cursor: pointer;">📅 Data</button>
+                <button onclick="ordenarConsulta('fornecedor')" style="padding: 8px 15px; background: #2196F3; color: white; border: none; border-radius: 5px; cursor: pointer;">🏢 Fornecedor</button>
+                <button onclick="ordenarConsulta('empresa')" style="padding: 8px 15px; background: #2196F3; color: white; border: none; border-radius: 5px; cursor: pointer;">🏭 Empresa</button>
+                <button onclick="ordenarConsulta('valor')" style="padding: 8px 15px; background: #2196F3; color: white; border: none; border-radius: 5px; cursor: pointer;">💰 Valor</button>
+            </div>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Vencimento</th>
+                            <th>Empresa</th>
+                            <th>Fornecedor</th>
+                            <th>Tipo</th>
+                            <th>NF</th>
+                            <th>Valor</th>
+                            <th>Parcelas</th>
+                            <th>Status</th>
+                            <th>Data Pagamento</th>
+                            <th>Observações</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpoContas">
+                        <tr><td colspan="11" class="no-data">Clique em Filtrar</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <button onclick="imprimirConsultaFiltrada()" style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">🖨️ Imprimir Filtrado</button>
+                <button onclick="gerarPDFConsultaFiltrada()" style="padding: 10px 20px; background: #FF6B6B; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">📄 PDF Filtrado</button>
+            </div>
+        </div>
+
+        <!-- RELATÓRIOS -->
+        <div id="relatorios" class="tab-content">
+            <h2>📋 Relatórios</h2>
+            <div class="filtros-container">
+                <div class="filtro-item">
+                    <label>De:</label>
+                    <input type="text" id="relDataDe" placeholder="DD/MM/AAAA" maxlength="10" oninput="formatarData(this)">
+                </div>
+                <div class="filtro-item">
+                    <label>Até:</label>
+                    <input type="text" id="relDataAte" placeholder="DD/MM/AAAA" maxlength="10" oninput="formatarData(this)">
+                </div>
+                <div class="filtro-item">
+                    <button onclick="gerarRelatorio('pagar')">📄 A Pagar</button>
+                    <button onclick="gerarRelatorio('pago')">✅ Pago</button>
+                </div>
+            </div>
+
+            <h3>Contas a Pagar</h3>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Vencimento</th>
+                            <th>Fornecedor</th>
+                            <th>Tipo</th>
+                            <th>NF</th>
+                            <th>Valor</th>
+                            <th>Parcelas</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpoRelatorioAPagar">
+                        <tr><td colspan="6" class="no-data">Gere um relatório</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3 style="margin-top: 30px;">Contas Pagas</h3>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Vencimento</th>
+                            <th>Fornecedor</th>
+                            <th>Tipo</th>
+                            <th>NF</th>
+                            <th>Valor</th>
+                            <th>Pago em</th>
+                            <th>Parcelas</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpoRelatorioPago">
+                        <tr><td colspan="7" class="no-data">Gere um relatório</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- FLUXO DE CAIXA -->
+        <div id="fluxocaixa" class="tab-content">
+            <h2>💰 Fluxo de Caixa</h2>
+            <div class="info-box">
+                Calcule o saldo entre faturamento e despesas em um período específico.
+            </div>
+            
+            <div style="margin-bottom: 30px;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>De (DD/MM/AAAA) *</label>
+                        <input type="text" id="fluxoDataDe" placeholder="01/12/2025" maxlength="10" oninput="formatarData(this)" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Até (DD/MM/AAAA) *</label>
+                        <input type="text" id="fluxoDataAte" placeholder="31/12/2025" maxlength="10" oninput="formatarData(this)" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Faturamento *</label>
+                        <input type="text" id="fluxoFaturamento" placeholder="10.000,00" oninput="formatarMoeda(this)" required>
+                    </div>
+                    <button onclick="calcularFluxoCaixa()" style="margin-top: 20px;">📊 Calcular</button>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+                <div style="background: #E8F5E9; padding: 20px; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 12px; color: #555;">Faturamento</div>
+                    <div id="fluxoValorFaturamento" style="font-size: 24px; font-weight: bold; color: #4CAF50;">R$ 0,00</div>
+                </div>
+                <div style="background: #FFEBEE; padding: 20px; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 12px; color: #555;">Total Despesas</div>
+                    <div id="fluxoValorDespesas" style="font-size: 24px; font-weight: bold; color: #F44336;">R$ 0,00</div>
+                </div>
+                <div style="background: #E3F2FD; padding: 20px; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 12px; color: #555;">Saldo</div>
+                    <div id="fluxoValorSaldo" style="font-size: 24px; font-weight: bold; color: #2196F3;">R$ 0,00</div>
+                </div>
+            </div>
+
+            <h3>Contas do Período</h3>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Vencimento</th>
+                            <th>Fornecedor</th>
+                            <th>Tipo</th>
+                            <th>Valor</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpoFluxoCaixa">
+                        <tr><td colspan="5" class="no-data">Clique em "Calcular"</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TIPOS -->
+        <div id="tipos" class="tab-content">
+            <h2>🏷️ Tipos de Conta</h2>
+            <div class="info-box">
+                Cadastre os tipos de conta que você usa. Eles aparecerão no formulário de Adicionar.
+            </div>
+            <div style="margin-bottom: 20px;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Novo Tipo *</label>
+                        <input type="text" id="novoTipo" placeholder="Ex: Aluguel, Combustível, etc">
+                    </div>
+                </div>
+                <button onclick="adicionarTipo()" style="width: 100%;">➕ Adicionar Tipo</button>
+            </div>
+            <h3>Tipos Cadastrados</h3>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tipo</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpoTipos">
+                        <tr><td colspan="2" class="no-data">Nenhum tipo cadastrado</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- FORNECEDORES -->
+        <div id="fornecedores" class="tab-content">
+            <h2>🏢 Fornecedores</h2>
+            <div class="info-box">
+                Cadastre seus fornecedores aqui. Depois você seleciona ao adicionar uma conta.
+            </div>
+            <div style="margin-bottom: 20px;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nome do Fornecedor *</label>
+                        <input type="text" id="novoFornecedor" placeholder="Ex: Fornecedor XYZ">
+                    </div>
+                    <div class="form-group">
+                        <label>CNPJ</label>
+                        <input type="text" id="cnpjFornecedor" placeholder="00.000.000/0000-00" oninput="formatarCNPJ(this)">
+                    </div>
+                </div>
+                <button onclick="adicionarFornecedor()" style="width: 100%;">➕ Adicionar Fornecedor</button>
+            </div>
+            <h3>Fornecedores Cadastrados</h3>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>CNPJ</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpoFornecedores">
+                        <tr><td colspan="3" class="no-data">Nenhum fornecedor cadastrado</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- EMPRESAS -->
+        <div id="empresas" class="tab-content">
+            <h2>🏭 Empresas</h2>
+            <div class="info-box">
+                Cadastre as empresas/centros de custo aqui.
+            </div>
+            <div style="margin-bottom: 20px;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nome da Empresa *</label>
+                        <input type="text" id="novaEmpresa" placeholder="Ex: LB Florestal">
+                    </div>
+                    <div class="form-group">
+                        <label>CNPJ</label>
+                        <input type="text" id="cnpjEmpresa" placeholder="00.000.000/0000-00" oninput="formatarCNPJ(this)">
+                    </div>
+                </div>
+                <button onclick="adicionarEmpresa()" style="width: 100%;">➕ Adicionar Empresa</button>
+            </div>
+            <h3>Empresas Cadastradas</h3>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>CNPJ</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpoEmpresas">
+                        <tr><td colspan="3" class="no-data">Nenhuma empresa cadastrada</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ARQUIVOS -->
+        <div id="arquivos" class="tab-content">
+            <h2>📦 Arquivos de Meses</h2>
+            <div class="info-box">
+                Arquive contas do mês passado. Elas saem da visualização atual, mas continuam guardadas no histórico.
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label>Selecione o mês para arquivar:</label>
+                <div class="form-row">
+                    <div class="form-group">
+                        <input type="month" id="mesArquivar" style="width: 100%;">
+                    </div>
+                    <button onclick="arquivarMes()" style="margin-top: 20px;">📦 Arquivar Mês</button>
+                </div>
+            </div>
+
+            <h3>Meses Arquivados</h3>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Mês</th>
+                            <th>Total de Contas</th>
+                            <th>Total Valor</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpoArquivos">
+                        <tr><td colspan="4" class="no-data">Nenhum mês arquivado</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- SINCRONIZAR -->
+        <div id="sincronizar" class="tab-content">
+            <h2>🔄 Sincronizar Dados</h2>
+            <div class="info-box">
+                <strong>Como funciona:</strong><br>
+                1. Clique em "Exportar" para baixar seus dados<br>
+                2. Envie o arquivo JSON para seu colega via WhatsApp/Email<br>
+                3. Seu colega clica em "Importar" e seleciona o arquivo<br>
+                4. Pronto! Os dados estão sincronizados 🎉
+            </div>
+
+            <div class="sync-buttons">
+                <button onclick="fbCarregar()" style="background:#FF6F00;">🔄 Sincronizar Firebase</button>
+                <button onclick="exportarDados()">📥 Exportar Dados (JSON)</button>
+                <button onclick="exportarExcel()">📊 Exportar Excel</button>
+                <button onclick="document.getElementById('importFile').click()">📤 Importar Dados</button>
+                <button onclick="deletarDuplicados()" style="background: #2196F3;">🔍 Deletar Duplicados</button>
+                <input type="file" id="importFile" accept=".json,.xlsx,.xls" style="display:none" onchange="importarDados()">
+                <button onclick="limparDados()" class="btn-delete">🗑️ Limpar Todos os Dados</button>
+            </div>
+
+            <h3>Dados Atuais</h3>
+            <p id="statusDados">Carregando...</p>
+        </div>
+    </div>
+
+    <!-- MODAL PAGAMENTO -->
+    <div id="modalPagamento" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fecharModal('modalPagamento')">&times;</span>
+            <div class="modal-header">✅ Registrar Pagamento</div>
+            <form onsubmit="salvarPagamento(event)">
+                <div class="form-group">
+                    <label>Conta</label>
+                    <input type="text" id="pagmentoConta" disabled>
+                </div>
+                <div class="form-group">
+                    <label>Valor</label>
+                    <input type="text" id="pagamentoValor" disabled>
+                </div>
+                <div class="form-group">
+                    <label>Data do Pagamento (DD/MM/AAAA) *</label>
+                    <input type="text" id="dataPagamento" placeholder="25/11/2025" maxlength="10" oninput="formatarData(this)" required>
+                </div>
+                <input type="hidden" id="idContaPagamento">
+                <button type="submit" style="width: 100%;">✅ Confirmar</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalEditar" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fecharModal('modalEditar')">&times;</span>
+            <div class="modal-header">✏️ Editar Conta</div>
+            <form onsubmit="salvarEdicaoConta(event)">
+                <div class="form-group">
+                    <label>Data de Vencimento (DD/MM/AAAA) *</label>
+                    <input type="text" id="editarData" placeholder="01/12/2025" maxlength="10" oninput="formatarData(this)" required>
+                </div>
+                <div class="form-group">
+                    <label>Fornecedor *</label>
+                    <input type="text" id="editarFornecedor" placeholder="Nome do fornecedor" required>
+                </div>
+                <div class="form-group">
+                    <label>Número NF *</label>
+                    <input type="text" id="editarNF" placeholder="1254" required>
+                </div>
+                <div class="form-group">
+                    <label>Valor *</label>
+                    <input type="text" id="editarValor" placeholder="1.000,00" required oninput="formatarMoeda(this)">
+                </div>
+                <div class="form-group">
+                    <label>Tipo</label>
+                    <select id="editarTipo">
+                        <option value="">Selecione</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Observações</label>
+                    <textarea id="editarObservacoes" rows="3"></textarea>
+                </div>
+                <input type="hidden" id="idContaEditar">
+                <button type="submit" style="width: 100%;">✅ Salvar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL EDITAR FORNECEDOR -->
+    <div id="modalEditarFornecedor" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fecharModal('modalEditarFornecedor')">&times;</span>
+            <div class="modal-header">✏️ Editar Fornecedor</div>
+            <form onsubmit="salvarEdicaoFornecedor(event)">
+                <div class="form-group">
+                    <label>Nome do Fornecedor *</label>
+                    <input type="text" id="editarNomeFornecedor" placeholder="Nome do fornecedor" required>
+                </div>
+                <div class="form-group">
+                    <label>CNPJ</label>
+                    <input type="text" id="editarCNPJFornecedor" placeholder="00.000.000/0000-00">
+                </div>
+                <input type="hidden" id="idFornecedorEditar">
+                <button type="submit" style="width: 100%; padding: 10px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">✅ Salvar</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ===== ARMAZENAMENTO - Firebase é a fonte verdadeira =====
+        // Variáveis globais em memória - sempre atualizadas pelo Firebase
+        var _CONTAS = [];
+        var _FORNECEDORES = [];
+        var _EMPRESAS = [];
+        var _TIPOS = [];
+
+        function salvarContas(contas) {
+            _CONTAS = contas;
+            localStorage.setItem('contas_lbflorestal', JSON.stringify(contas));
+        }
+
+        function obterContas() {
+            return _CONTAS.length > 0 ? _CONTAS : JSON.parse(localStorage.getItem('contas_lbflorestal') || '[]');
+        }
+
+        // ===== FORMATAÇÃO =====
+        function formatarMoeda(input) {
+            let value = input.value.replace(/\D/g, '');
+            if (value === '') return;
+            value = (value / 100).toFixed(2).replace('.', ',');
+            value = value.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            input.value = value;
+        }
+
+        function formatarData(input) {
+            let value = input.value.replace(/\D/g, '');
+            if (value.length <= 2) {
+                input.value = value;
+            } else if (value.length <= 4) {
+                input.value = value.substring(0, 2) + '/' + value.substring(2);
+            } else {
+                input.value = value.substring(0, 2) + '/' + value.substring(2, 4) + '/' + value.substring(4, 8);
+            }
+        }
+
+        function formatarCNPJ(input) {
+            let valor = input.value.replace(/\D/g, '');
+            if (valor.length <= 11) {
+                valor = valor.replace(/(\d{3})(\d)/, '$1.$2');
+                valor = valor.replace(/(\d{3})(\d)/, '$1.$2');
+                valor = valor.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+            } else {
+                valor = valor.replace(/(\d{2})(\d)/, '$1.$2');
+                valor = valor.replace(/(\d{3})(\d)/, '$1.$2');
+                valor = valor.replace(/(\d{3})(\d)/, '$1/$2');
+                valor = valor.replace(/(\d{4})(\d)/, '$1-$2');
+            }
+            input.value = valor;
+        }
+
+        function toggleParcelas() {
+            const parcelada = document.getElementById('parcelada').value;
+            document.getElementById('grupoParcelasDiv').style.display = parcelada === 'sim' ? 'block' : 'none';
+        }
+
+        function toggleRepetir() {
+            const fixa = document.getElementById('fixa').value;
+            document.getElementById('grupoRepetirDiv').style.display = fixa === 'sim' ? 'block' : 'none';
+        }
+
+        // ===== ABAS =====
+        function mostrarAba(abaId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(abaId).classList.add('active');
+
+            if (abaId === 'dashboard') renderizarDashboard();
+            if (abaId === 'sincronizar') atualizarStatusSync();
+            if (abaId === 'adicionar') atualizarSelects();
+            if (abaId === 'consultar') atualizarFiltroEmpresa();
+            if (abaId === 'tipos') renderizarTipos();
+            if (abaId === 'fornecedores') renderizarFornecedores();
+            if (abaId === 'empresas') renderizarEmpresas();
+            if (abaId === 'arquivos') renderizarArquivos();
+        }
+
+        // ===== CONTAS =====
+        function adicionarConta(event) {
+            event.preventDefault();
+
+            const empresa = document.getElementById('selectEmpresa').value;
+            const fornecedor = document.getElementById('selectFornecedor').value;
+            const tipo = document.getElementById('tipo').value;
+            const numeroNF = document.getElementById('numeroNF').value;
+            const valorStr = document.getElementById('valor').value.replace(/\./g, '').replace(',', '.');
+            const valor = parseFloat(valorStr);
+            const vencimentoStr = document.getElementById('vencimento').value;
+            const observacoes = document.getElementById('observacoes').value;
+            const parcelada = document.getElementById('parcelada').value;
+            const numeroParcelas = parseInt(document.getElementById('numeroParcelas').value) || 1;
+            const fixa = document.getElementById('fixa').value;
+            const repetirMensalmente = document.getElementById('repetirMensalmente').value;
+
+            if (!/^\d{2}\/\d{2}\/\d{4}$/.test(vencimentoStr)) {
+                alert('❌ Formato de data inválido!');
+                return;
+            }
+
+            const [dia, mes, ano] = vencimentoStr.split('/').map(Number);
+            const vencimento = new Date(ano, mes - 1, dia);
+
+            const contas = obterContas();
+
+            if (parcelada === 'sim' && numeroParcelas > 1) {
+                const idBaseParcela = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+                for (let i = 0; i < numeroParcelas; i++) {
+                    const dataVencimento = new Date(vencimento.getFullYear(), vencimento.getMonth() + i, vencimento.getDate());
+                    const uniqueId = idBaseParcela + '_p' + (i + 1);
+                    
+                    contas.push({
+                        id: uniqueId,
+                        empresa, fornecedor, tipo, numeroNF, 
+                        valor: valor,
+                        vencimento: dataVencimento.toISOString().split('T')[0], 
+                        observacoes: `${observacoes} (Parcela ${i + 1}/${numeroParcelas})`, 
+                        parcelada: 'sim', 
+                        numeroParcelas: numeroParcelas,
+                        parcelaNumero: i + 1,
+                        fixa: 'não',
+                        pago: false, 
+                        data_pagamento: null, 
+                        data_criacao: new Date().toISOString()
+                    });
+                }
+            } else if (fixa === 'sim' && repetirMensalmente !== 'não') {
+                const meses = parseInt(repetirMensalmente);
+                const idBaseFix = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+                for (let i = 0; i < meses; i++) {
+                    const dataVencimento = new Date(vencimento.getFullYear(), vencimento.getMonth() + i, vencimento.getDate());
+                    const uniqueId = idBaseFix + '_fix_' + (i + 1);
+                    
+                    contas.push({
+                        id: uniqueId,
+                        empresa, fornecedor, tipo, numeroNF, valor,
+                        vencimento: dataVencimento.toISOString().split('T')[0], 
+                        observacoes, 
+                        parcelada: 'não', 
+                        numeroParcelas: 1,
+                        fixa: 'sim',
+                        pago: false, 
+                        data_pagamento: null, 
+                        data_criacao: new Date().toISOString()
+                    });
+                }
+            } else {
+                const uniqueId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+                contas.push({
+                    id: uniqueId,
+                    empresa, fornecedor, tipo, numeroNF, valor, 
+                    vencimento: vencimento.toISOString().split('T')[0], 
+                    observacoes, parcelada, numeroParcelas,
+                    fixa: fixa,
+                    pago: false, 
+                    data_pagamento: null, 
+                    data_criacao: new Date().toISOString()
+                });
+            }
+
+            salvarContas(contas);
+            if(window.fbSalvarItem){var _todas=obterContas(),_n=(parcelada==='sim'&&numeroParcelas>1?numeroParcelas:(fixa==='sim'&&repetirMensalmente!=='não'?parseInt(repetirMensalmente):1));_todas.slice(-_n).forEach(function(c){fbSalvarItem('contas',c);});}
+            let msg = '✅ Conta adicionada!';
+            if (parcelada === 'sim' && numeroParcelas > 1) msg += ` (${numeroParcelas} parcelas criadas)`;
+            if (fixa === 'sim' && repetirMensalmente !== 'não') msg += ` (${repetirMensalmente} meses criados)`;
+            alert(msg);
+            event.target.reset();
+            renderizarDashboard();
+        }
+
+        function abrirModalPagamento(id) {
+            const contas = obterContas();
+            const conta = contas.find(c => c.id === id);
+            if (conta) {
+                document.getElementById('pagmentoConta').value = `${conta.fornecedor} - ${conta.numeroNF}`;
+                document.getElementById('pagamentoValor').value = `R$ ${conta.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+                document.getElementById('dataPagamento').value = '';
+                document.getElementById('idContaPagamento').value = id;
+                document.getElementById('modalPagamento').style.display = 'block';
+            }
+        }
+
+        function salvarPagamento(event) {
+            event.preventDefault();
+            const id = document.getElementById('idContaPagamento').value;
+            const dataPagamentoStr = document.getElementById('dataPagamento').value;
+
+            if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dataPagamentoStr)) {
+                alert('❌ Formato de data inválido!');
+                return;
+            }
+
+            const [dia, mes, ano] = dataPagamentoStr.split('/').map(Number);
+            const dataPagamento = new Date(ano, mes - 1, dia).toISOString().split('T')[0];
+
+            const contas = obterContas();
+            const conta = contas.find(c => c.id === id);
+            if (conta) {
+                conta.pago = true;
+                conta.data_pagamento = dataPagamento;
+                salvarContas(contas);
+                if(window.fbSalvarItem) fbSalvarItem('contas', conta);
+                fecharModal('modalPagamento');
+                alert('✅ Pagamento registrado!');
+                consultarContas();
+                renderizarDashboard();
+            }
+        }
+
+        function desfazerPagamento(id) {
+            if (!confirm('Desfazer pagamento?')) return;
+            const contas = obterContas();
+            const conta = contas.find(c => c.id === id);
+            if (conta) {
+                conta.pago = false;
+                conta.data_pagamento = null;
+                salvarContas(contas);
+                if(window.fbSalvarItem) fbSalvarItem('contas', conta);
+                consultarContas();
+            }
+        }
+
+        function deletarConta(id) {
+            if (!confirm('Deletar conta?')) return;
+            let contas = obterContas();
+            contas = contas.filter(c => c.id !== id);
+            salvarContas(contas);
+            if(window.fbDeletar) fbDeletar('contas', id);
+            alert('✅ Conta deletada!');
+            consultarContas();
+            renderizarDashboard();
+        }
+
+        function abrirModalEditar(id) {
+            const contas = obterContas();
+            const conta = contas.find(c => c.id === id);
+            
+            if (!conta) return;
+            
+            const dataFormatada = new Date(conta.vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
+            document.getElementById('editarData').value = dataFormatada;
+            document.getElementById('editarFornecedor').value = conta.fornecedor || '';
+            document.getElementById('editarNF').value = conta.numeroNF || '';
+            document.getElementById('editarValor').value = conta.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+            document.getElementById('editarObservacoes').value = conta.observacoes || '';
+            document.getElementById('idContaEditar').value = id;
+            
+            const tipos = obterTipos();
+            const selectTipo = document.getElementById('editarTipo');
+            
+            let html = '<option value="">Selecione</option>';
+            tipos.forEach(t => {
+                const selected = conta.tipo && conta.tipo === t.nome ? 'selected' : '';
+                html += `<option value="${t.nome}" ${selected}>${t.nome}</option>`;
+            });
+            
+            if (conta.tipo && !tipos.find(t => t.nome === conta.tipo)) {
+                html += `<option value="${conta.tipo}" selected>${conta.tipo}</option>`;
+            }
+            
+            selectTipo.innerHTML = html;
+            
+            if (conta.tipo) {
+                selectTipo.value = conta.tipo;
+            } else {
+                selectTipo.value = '';
+            }
+            
+            document.getElementById('modalEditar').style.display = 'block';
+        }
+
+        // ✅ v2.2 - Edição com opção de alterar todas as parcelas do lote
+        function salvarEdicaoConta(event) {
+            event.preventDefault();
+            
+            const id = document.getElementById('idContaEditar').value;
+            const dataStr = document.getElementById('editarData').value;
+            const fornecedor = document.getElementById('editarFornecedor').value;
+            const numeroNF = document.getElementById('editarNF').value;
+            const valorStr = document.getElementById('editarValor').value.replace(/\./g, '').replace(',', '.');
+            const valor = parseFloat(valorStr);
+            
+            const selectTipo = document.getElementById('editarTipo');
+            let tipo = selectTipo.value;
+            if (!tipo || tipo === '') {
+                tipo = selectTipo.options[selectTipo.selectedIndex].value || '';
+            }
+            
+            const observacoes = document.getElementById('editarObservacoes').value;
+            
+            if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dataStr)) {
+                alert('❌ Formato de data inválido!');
+                return;
+            }
+            
+            const [dia, mes, ano] = dataStr.split('/').map(Number);
+            const vencimento = new Date(ano, mes - 1, dia).toISOString().split('T')[0];
+            
+            let contas = obterContas();
+            const conta = contas.find(c => c.id === id);
+            
+            if (!conta) {
+                alert('❌ Conta não encontrada!');
+                return;
+            }
+
+            // ✅ NOVO v2.2: Se for parcela, perguntar se altera só esta ou todas
+            if (conta.parcelada === 'sim' && conta.numeroParcelas > 1) {
+                const alterarTodas = confirm(
+                    `Esta conta é parcelada (Parcela ${conta.parcelaNumero}/${conta.numeroParcelas}).\n\n` +
+                    `Deseja alterar:\n` +
+                    `✅ OK = TODAS as parcelas (valor e tipo)\n` +
+                    `❌ Cancelar = Somente esta parcela`
+                );
+
+                if (alterarTodas) {
+                    // Identificar apenas parcelas do mesmo lote que ainda NÃO foram pagas
+                    const lote = contas.filter(c =>
+                        c.parcelada === 'sim' &&
+                        c.fornecedor === conta.fornecedor &&
+                        c.numeroNF === conta.numeroNF &&
+                        c.empresa === conta.empresa &&
+                        c.numeroParcelas === conta.numeroParcelas &&
+                        !c.pago
+                    );
+
+                    lote.forEach(c => {
+                        c.valor = valor;
+                        c.tipo = tipo;
+                        c.fornecedor = fornecedor;
+                        // Preserva o sufixo "(Parcela X/Y)" em cada uma
+                        const match = c.observacoes && c.observacoes.match(/(.*?)(\s*\(Parcela \d+\/\d+\))\s*$/);
+                        if (match) {
+                            const obsBase = observacoes.replace(/(\s*\(Parcela \d+\/\d+\))\s*$/, '').trim();
+                            c.observacoes = obsBase ? `${obsBase} ${match[2].trim()}` : match[2].trim();
+                        } else {
+                            c.observacoes = observacoes;
+                        }
+                    });
+
+                    // Somente a parcela atual muda o vencimento e NF
+                    conta.vencimento = vencimento;
+                    conta.numeroNF = numeroNF;
+
+                    salvarContas(contas);
+                    alert(`✅ ${lote.length} parcela(s) atualizada(s) com sucesso!`);
+                } else {
+                    // Alterar só esta parcela
+                    conta.vencimento = vencimento;
+                    conta.fornecedor = fornecedor;
+                    conta.numeroNF = numeroNF;
+                    conta.valor = valor;
+                    conta.tipo = tipo;
+                    conta.observacoes = observacoes;
+                    salvarContas(contas);
+                    alert('✅ Parcela editada com sucesso!');
+                }
+            } else {
+                // Conta normal (não parcelada)
+                conta.vencimento = vencimento;
+                conta.fornecedor = fornecedor;
+                conta.numeroNF = numeroNF;
+                conta.valor = valor;
+                conta.tipo = tipo;
+                conta.observacoes = observacoes;
+                salvarContas(contas);
+                if(window.fbSalvarItem) fbSalvarItem('contas', conta);
+                alert('✅ Conta editada com sucesso!');
+            }
+
+            fecharModal('modalEditar');
+            consultarContas();
+            renderizarDashboard();
+        }
+
+        // ===== DASHBOARD =====
+        function renderizarDashboard() {
+            const contas = obterContas();
+            const totalAberto = contas.filter(c => !c.pago).reduce((sum, c) => sum + c.valor, 0);
+            const totalPago = contas.filter(c => c.pago).reduce((sum, c) => sum + c.valor, 0);
+
+            document.getElementById('totalContas').textContent = contas.length;
+            document.getElementById('totalAberto').textContent = `R$ ${totalAberto.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+            document.getElementById('totalPago').textContent = `R$ ${totalPago.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+
+            const hoje = new Date();
+            hoje.setHours(0, 0, 0, 0);
+            const dentro15 = new Date(hoje.getTime() + 15 * 24 * 60 * 60 * 1000);
+            
+            const proximos = contas.filter(c => {
+                const data = new Date(c.vencimento + 'T00:00:00');
+                return data >= hoje && data <= dentro15 && !c.pago;
+            }).sort((a, b) => new Date(a.vencimento) - new Date(b.vencimento));
+
+            const corpo = document.getElementById('corpoProximos');
+            if (proximos.length === 0) {
+                corpo.innerHTML = '<tr><td colspan="5" class="no-data">Nenhuma</td></tr>';
+            } else {
+                corpo.innerHTML = proximos.map(c => {
+                    const vencimento = new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
+                    return `<tr>
+                        <td>${vencimento}</td>
+                        <td>${c.fornecedor}</td>
+                        <td>${c.tipo}</td>
+                        <td class="currency">R$ ${c.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                        <td><span class="status-pendente">⏳ Pendente</span></td>
+                    </tr>`;
+                }).join('');
+            }
+        }
+
+        // ===== CONSULTAR =====
+        let ultimaOrdenacao = { campo: null, ascendente: true };
+
+        function atualizarFiltroEmpresa() {
+            const empresas = obterEmpresas();
+            const fornecedores = obterFornecedores();
+            const contas = obterContas();
+            const tipos = obterTipos();
+            
+            const fornecedoresDosCadas = fornecedores.map(f => f.nome);
+            const fornecedoresDasContas = [...new Set(contas.map(c => c.fornecedor).filter(f => f))];
+            const todosFornecedores = [...new Set([...fornecedoresDosCadas, ...fornecedoresDasContas])];
+            
+            const selectEmpresa = document.getElementById('filtroEmpresa');
+            selectEmpresa.innerHTML = '<option value="">Todas</option>' + 
+                empresas.map(e => `<option value="${e.nome}">${e.nome}</option>`).join('');
+            
+            const selectFornecedor = document.getElementById('filtroFornecedor');
+            selectFornecedor.innerHTML = '<option value="">Todos</option>' + 
+                todosFornecedores.sort().map(f => `<option value="${f}">${f}</option>`).join('');
+            
+            const selectTipo = document.getElementById('filtroTipo');
+            selectTipo.innerHTML = '<option value="">Todos</option>' + 
+                tipos.map(t => `<option value="${t.nome}">${t.nome}</option>`).join('');
+        }
+
+        function limparFiltros() {
+            document.getElementById('filtroDataDe').value = '';
+            document.getElementById('filtroDataAte').value = '';
+            document.getElementById('filtroEmpresa').value = '';
+            document.getElementById('filtroFornecedor').value = '';
+            document.getElementById('filtroTipo').value = '';
+            document.getElementById('filtroStatus').value = '';
+            document.getElementById('filtroValorMin').value = '';
+            document.getElementById('filtroValorMax').value = '';
+            ultimaOrdenacao = { campo: null, ascendente: true };
+            document.getElementById('corpoContas').innerHTML = '<tr><td colspan="11" class="no-data">Clique em Filtrar</td></tr>';
+        }
+
+        function consultarContas() {
+            const dataDE = document.getElementById('filtroDataDe').value;
+            const dataATE = document.getElementById('filtroDataAte').value;
+            const empresa = document.getElementById('filtroEmpresa').value;
+            const fornecedor = document.getElementById('filtroFornecedor').value;
+            const tipo = document.getElementById('filtroTipo').value;
+            const status = document.getElementById('filtroStatus').value;
+            const valorMinStr = document.getElementById('filtroValorMin').value;
+            const valorMaxStr = document.getElementById('filtroValorMax').value;
+
+            let contas = obterContas();
+
+            if (dataDE && /^\d{2}\/\d{2}\/\d{4}$/.test(dataDE)) {
+                const [d, m, a] = dataDE.split('/').map(Number);
+                const deStr = String(a).padStart(4, '0') + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+                contas = contas.filter(c => c.vencimento >= deStr);
+            }
+
+            if (dataATE && /^\d{2}\/\d{2}\/\d{4}$/.test(dataATE)) {
+                const [d, m, a] = dataATE.split('/').map(Number);
+                const ateStr = String(a).padStart(4, '0') + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+                contas = contas.filter(c => c.vencimento <= ateStr);
+            }
+
+            if (empresa) contas = contas.filter(c => c.empresa === empresa);
+            if (fornecedor) contas = contas.filter(c => c.fornecedor === fornecedor);
+            if (tipo) contas = contas.filter(c => c.tipo === tipo);
+            if (status === 'pago') contas = contas.filter(c => c.pago);
+            if (status === 'pendente') contas = contas.filter(c => !c.pago);
+
+            if (valorMinStr) {
+                const valorMin = parseFloat(valorMinStr.replace(/\./g, '').replace(',', '.'));
+                contas = contas.filter(c => c.valor >= valorMin);
+            }
+
+            if (valorMaxStr) {
+                const valorMax = parseFloat(valorMaxStr.replace(/\./g, '').replace(',', '.'));
+                contas = contas.filter(c => c.valor <= valorMax);
+            }
+
+            contas.sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+
+            renderizarConsultaContas(contas);
+        }
+
+        function ordenarConsulta(campo) {
+            const dataDE = document.getElementById('filtroDataDe').value;
+            const dataATE = document.getElementById('filtroDataAte').value;
+            const empresa = document.getElementById('filtroEmpresa').value;
+            const fornecedor = document.getElementById('filtroFornecedor').value;
+            const tipo = document.getElementById('filtroTipo').value;
+            const status = document.getElementById('filtroStatus').value;
+            const valorMinStr = document.getElementById('filtroValorMin').value;
+            const valorMaxStr = document.getElementById('filtroValorMax').value;
+
+            let contas = obterContas();
+
+            if (dataDE && /^\d{2}\/\d{2}\/\d{4}$/.test(dataDE)) {
+                const [d, m, a] = dataDE.split('/').map(Number);
+                const deStr = String(a).padStart(4, '0') + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+                contas = contas.filter(c => c.vencimento >= deStr);
+            }
+
+            if (dataATE && /^\d{2}\/\d{2}\/\d{4}$/.test(dataATE)) {
+                const [d, m, a] = dataATE.split('/').map(Number);
+                const ateStr = String(a).padStart(4, '0') + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+                contas = contas.filter(c => c.vencimento <= ateStr);
+            }
+
+            if (empresa) contas = contas.filter(c => c.empresa === empresa);
+            if (fornecedor) contas = contas.filter(c => c.fornecedor === fornecedor);
+            if (tipo) contas = contas.filter(c => c.tipo === tipo);
+            if (status === 'pago') contas = contas.filter(c => c.pago);
+            if (status === 'pendente') contas = contas.filter(c => !c.pago);
+
+            if (valorMinStr) {
+                const valorMin = parseFloat(valorMinStr.replace(/\./g, '').replace(',', '.'));
+                contas = contas.filter(c => c.valor >= valorMin);
+            }
+
+            if (valorMaxStr) {
+                const valorMax = parseFloat(valorMaxStr.replace(/\./g, '').replace(',', '.'));
+                contas = contas.filter(c => c.valor <= valorMax);
+            }
+
+            if (ultimaOrdenacao.campo === campo) {
+                ultimaOrdenacao.ascendente = !ultimaOrdenacao.ascendente;
+            } else {
+                ultimaOrdenacao.campo = campo;
+                ultimaOrdenacao.ascendente = true;
+            }
+
+            contas.sort((a, b) => {
+                let valA, valB;
+                
+                if (campo === 'vencimento') {
+                    valA = a.vencimento;
+                    valB = b.vencimento;
+                } else if (campo === 'fornecedor') {
+                    valA = (a.fornecedor || '').toUpperCase();
+                    valB = (b.fornecedor || '').toUpperCase();
+                } else if (campo === 'empresa') {
+                    valA = (a.empresa || '').toUpperCase();
+                    valB = (b.empresa || '').toUpperCase();
+                } else if (campo === 'valor') {
+                    valA = a.valor;
+                    valB = b.valor;
+                }
+
+                if (ultimaOrdenacao.ascendente) {
+                    return valA < valB ? -1 : valA > valB ? 1 : 0;
+                } else {
+                    return valA > valB ? -1 : valA < valB ? 1 : 0;
+                }
+            });
+
+            renderizarConsultaContas(contas);
+        }
+
+        function renderizarConsultaContas(contas) {
+            const corpo = document.getElementById('corpoContas');
+            if (contas.length === 0) {
+                corpo.innerHTML = '<tr><td colspan="11" class="no-data">Nenhuma conta encontrada</td></tr>';
+                return;
+            }
+
+            const total = contas.reduce((sum, c) => sum + c.valor, 0);
+            corpo.innerHTML = contas.map(c => {
+                const vencimento = new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
+                const dataPagamento = c.data_pagamento ? new Date(c.data_pagamento + 'T00:00:00').toLocaleDateString('pt-BR') : '-';
+                const statusClass = c.pago ? 'status-pago' : 'status-pendente';
+                const statusText = c.pago ? '✓ Pago' : '⏳ Pendente';
+                const parcelas = c.parcelada === 'sim' ? `${c.parcelaNumero}/${c.numeroParcelas}` : '-';
+                const observacoes = c.observacoes || '-';
+                return `<tr>
+                    <td>${vencimento}</td>
+                    <td>${c.empresa}</td>
+                    <td>${c.fornecedor}</td>
+                    <td>${c.tipo}</td>
+                    <td>${c.numeroNF}</td>
+                    <td class="currency">R$ ${c.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td>${parcelas}</td>
+                    <td><span class="${statusClass}">${statusText}</span></td>
+                    <td>${dataPagamento}</td>
+                    <td>${observacoes}</td>
+                    <td>
+                        ${!c.pago ? `<button class="btn-small btn-pagar" onclick="abrirModalPagamento('${c.id}')">Pagar</button>` : `<button class="btn-small btn-delete" onclick="desfazerPagamento('${c.id}')">Desfazer</button>`}
+                        <button class="btn-small" onclick="abrirModalEditar('${c.id}')" style="background: #2196F3;">Editar</button>
+                        <button class="btn-small btn-delete" onclick="deletarConta('${c.id}')">Del</button>
+                    </td>
+                </tr>`;
+            }).join('') + `<tr class="total-row"><td colspan="5">TOTAL</td><td class="currency">R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td><td colspan="5"></td></tr>`;
+        }
+
+        // ===== RELATÓRIOS =====
+        function gerarRelatorio(tipo) {
+            let contas = obterContas();
+            const dataDE = document.getElementById('relDataDe').value;
+            const dataATE = document.getElementById('relDataAte').value;
+
+            if (tipo === 'pagar') {
+                contas = contas.filter(c => !c.pago);
+            } else {
+                contas = contas.filter(c => c.pago);
+            }
+
+            if (dataDE && /^\d{2}\/\d{2}\/\d{4}$/.test(dataDE)) {
+                const [d, m, a] = dataDE.split('/').map(Number);
+                const de = new Date(a, m - 1, d);
+                de.setHours(0, 0, 0, 0);
+                contas = contas.filter(c => new Date(c.vencimento + 'T00:00:00') >= de);
+            }
+
+            if (dataATE && /^\d{2}\/\d{2}\/\d{4}$/.test(dataATE)) {
+                const [d, m, a] = dataATE.split('/').map(Number);
+                const ate = new Date(a, m - 1, d);
+                ate.setHours(23, 59, 59, 999);
+                contas = contas.filter(c => new Date(c.vencimento + 'T00:00:00') <= ate);
+            }
+
+            const corpoId = tipo === 'pagar' ? 'corpoRelatorioAPagar' : 'corpoRelatorioPago';
+            const corpo = document.getElementById(corpoId);
+
+            if (contas.length === 0) {
+                corpo.innerHTML = tipo === 'pagar' ? '<tr><td colspan="6" class="no-data">Nenhuma</td></tr>' : '<tr><td colspan="7" class="no-data">Nenhuma</td></tr>';
+                return;
+            }
+
+            const total = contas.reduce((sum, c) => sum + c.valor, 0);
+
+            if (tipo === 'pagar') {
+                corpo.innerHTML = contas.map(c => {
+                    const vencimento = new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
+                    const parcelas = c.parcelada === 'sim' ? `${c.parcelaNumero}/${c.numeroParcelas}` : '-';
+                    return `<tr>
+                        <td>${vencimento}</td>
+                        <td>${c.fornecedor}</td>
+                        <td>${c.tipo}</td>
+                        <td>${c.numeroNF}</td>
+                        <td class="currency">R$ ${c.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                        <td>${parcelas}</td>
+                    </tr>`;
+                }).join('') + `<tr class="total-row"><td colspan="4">TOTAL</td><td class="currency">R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td><td></td></tr>`;
+            } else {
+                corpo.innerHTML = contas.map(c => {
+                    const vencimento = new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
+                    const dataPago = c.data_pagamento ? new Date(c.data_pagamento + 'T00:00:00').toLocaleDateString('pt-BR') : '-';
+                    const parcelas = c.parcelada === 'sim' ? `${c.parcelaNumero}/${c.numeroParcelas}` : '-';
+                    return `<tr>
+                        <td>${vencimento}</td>
+                        <td>${c.fornecedor}</td>
+                        <td>${c.tipo}</td>
+                        <td>${c.numeroNF}</td>
+                        <td class="currency">R$ ${c.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                        <td>${dataPago}</td>
+                        <td>${parcelas}</td>
+                    </tr>`;
+                }).join('') + `<tr class="total-row"><td colspan="5">TOTAL</td><td class="currency">R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td><td></td></tr>`;
+            }
+
+            window.relatorioAtual = { tipo, contas, total };
+        }
+
+        // ===== FLUXO DE CAIXA =====
+        function calcularFluxoCaixa() {
+            const dataDeStr = document.getElementById('fluxoDataDe').value;
+            const dataAteStr = document.getElementById('fluxoDataAte').value;
+            const faturamentoStr = document.getElementById('fluxoFaturamento').value.replace(/\./g, '').replace(',', '.');
+            const faturamento = parseFloat(faturamentoStr);
+
+            if (!dataDeStr || !dataAteStr || !faturamento) {
+                alert('❌ Preencha todos os campos!');
+                return;
+            }
+
+            if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dataDeStr) || !/^\d{2}\/\d{2}\/\d{4}$/.test(dataAteStr)) {
+                alert('❌ Formato de data inválido!');
+                return;
+            }
+
+            const [d1, m1, a1] = dataDeStr.split('/').map(Number);
+            const [d2, m2, a2] = dataAteStr.split('/').map(Number);
+            const dataDe = new Date(a1, m1 - 1, d1);
+            const dataAte = new Date(a2, m2 - 1, d2);
+            dataDe.setHours(0, 0, 0, 0);
+            dataAte.setHours(23, 59, 59, 999);
+
+            const contas = obterContas();
+            const contasPeriodo = contas.filter(c => {
+                const dataVencimento = new Date(c.vencimento + 'T00:00:00');
+                return dataVencimento >= dataDe && dataVencimento <= dataAte;
+            });
+
+            const totalDespesas = contasPeriodo.reduce((sum, c) => sum + c.valor, 0);
+            const saldo = faturamento - totalDespesas;
+
+            document.getElementById('fluxoValorFaturamento').textContent = `R$ ${faturamento.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+            document.getElementById('fluxoValorDespesas').textContent = `R$ ${totalDespesas.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+            document.getElementById('fluxoValorSaldo').textContent = `R$ ${saldo.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+            document.getElementById('fluxoValorSaldo').style.color = saldo >= 0 ? '#4CAF50' : '#F44336';
+
+            const corpo = document.getElementById('corpoFluxoCaixa');
+            if (contasPeriodo.length === 0) {
+                corpo.innerHTML = '<tr><td colspan="5" class="no-data">Nenhuma conta no período</td></tr>';
+            } else {
+                corpo.innerHTML = contasPeriodo.map(c => {
+                    const vencimento = new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
+                    const statusText = c.pago ? '✓ Pago' : '⏳ Pendente';
+                    const statusClass = c.pago ? 'status-pago' : 'status-pendente';
+                    return `<tr>
+                        <td>${vencimento}</td>
+                        <td>${c.fornecedor}</td>
+                        <td>${c.tipo}</td>
+                        <td class="currency">R$ ${c.valor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                        <td><span class="${statusClass}">${statusText}</span></td>
+                    </tr>`;
+                }).join('');
+            }
+        }
+
+        // ===== TIPOS =====
+        function salvarTipos(tipos) {
+            _TIPOS = tipos;
+            localStorage.setItem('tipos_lbflorestal', JSON.stringify(tipos));
+        }
+
+        function obterTipos() {
+            if (_TIPOS.length > 0) return _TIPOS;
+            const dados = localStorage.getItem('tipos_lbflorestal');
+            if (!dados) {
+                const tiposPadrao = [
+                    {id: '1', nome: 'Material'},
+                    {id: '2', nome: 'Serviço'},
+                    {id: '3', nome: 'Fixa'}
+                ];
+                salvarTipos(tiposPadrao);
+                return tiposPadrao;
+            }
+            return JSON.parse(dados);
+        }
+
+        function adicionarTipo() {
+            const nome = document.getElementById('novoTipo').value;
+            if (!nome) {
+                alert('❌ Preencha o nome do tipo');
+                return;
+            }
+
+            const tipos = obterTipos();
+            const _novoT={id: Date.now().toString(), nome};
+            tipos.push(_novoT);
+            salvarTipos(tipos);
+            if(window.fbSalvarItem) fbSalvarItem('tipos', _novoT);
+            document.getElementById('novoTipo').value = '';
+            alert('✅ Tipo adicionado!');
+            renderizarTipos();
+            atualizarSelects();
+        }
+
+        function deletarTipo(id) {
+            if (!confirm('Deletar tipo?')) return;
+            let tipos = obterTipos();
+            tipos = tipos.filter(t => t.id !== id);
+            salvarTipos(tipos);
+            if(window.fbDeletar) fbDeletar('tipos', id);
+            renderizarTipos();
+            atualizarSelects();
+        }
+
+        function renderizarTipos() {
+            const tipos = obterTipos();
+            const corpo = document.getElementById('corpoTipos');
+            
+            if (tipos.length === 0) {
+                corpo.innerHTML = '<tr><td colspan="2" class="no-data">Nenhum tipo cadastrado</td></tr>';
+            } else {
+                corpo.innerHTML = tipos.map(t => `<tr>
+                    <td>${t.nome}</td>
+                    <td><button class="btn-small btn-delete" onclick="deletarTipo('${t.id}')">Deletar</button></td>
+                </tr>`).join('');
+            }
+        }
+
+        // ===== FORNECEDORES =====
+        function salvarFornecedores(fornecedores) {
+            _FORNECEDORES = fornecedores;
+            localStorage.setItem('fornecedores_lbflorestal', JSON.stringify(fornecedores));
+        }
+
+        function obterFornecedores() {
+            return _FORNECEDORES.length > 0 ? _FORNECEDORES : JSON.parse(localStorage.getItem('fornecedores_lbflorestal') || '[]');
+        }
+
+        function adicionarFornecedor() {
+            const nome = document.getElementById('novoFornecedor').value;
+            const cnpj = document.getElementById('cnpjFornecedor').value;
+
+            if (!nome) {
+                alert('❌ Preencha o nome do fornecedor');
+                return;
+            }
+
+            const fornecedores = obterFornecedores();
+            if (fornecedores.find(f => f.nome.toUpperCase() === nome.toUpperCase())) {
+                alert('⚠️ Este fornecedor já está cadastrado!');
+                return;
+            }
+
+            const _novoF={id: Date.now().toString(), nome, cnpj};
+            fornecedores.push(_novoF);
+            salvarFornecedores(fornecedores);
+            if(window.fbSalvarItem) fbSalvarItem('fornecedores', _novoF);
+            document.getElementById('novoFornecedor').value = '';
+            document.getElementById('cnpjFornecedor').value = '';
+            alert('✅ Fornecedor adicionado!');
+            renderizarFornecedores();
+            atualizarSelects();
+            atualizarFiltroEmpresa();
+        }
+
+        function deletarFornecedor(id) {
+            if (!confirm('Deletar fornecedor?')) return;
+            let fornecedores = obterFornecedores();
+            fornecedores = fornecedores.filter(f => f.id !== id);
+            salvarFornecedores(fornecedores);
+            if(window.fbDeletar) fbDeletar('fornecedores', id);
+            renderizarFornecedores();
+        }
+
+        function renderizarFornecedores() {
+            const fornecedores = obterFornecedores();
+            fornecedores.sort((a, b) => a.nome.toUpperCase().localeCompare(b.nome.toUpperCase()));
+            
+            const corpo = document.getElementById('corpoFornecedores');
+            
+            if (fornecedores.length === 0) {
+                corpo.innerHTML = '<tr><td colspan="3" class="no-data">Nenhum fornecedor cadastrado</td></tr>';
+            } else {
+                corpo.innerHTML = fornecedores.map(f => `<tr>
+                    <td>${f.nome}</td>
+                    <td>${f.cnpj || '-'}</td>
+                    <td>
+                        <button class="btn-small" onclick="abrirModalEditarFornecedor('${f.id}')" style="background: #2196F3;">✏️ Editar</button>
+                        <button class="btn-small btn-delete" onclick="deletarFornecedor('${f.id}')">🗑️ Deletar</button>
+                    </td>
+                </tr>`).join('');
+            }
+        }
+
+        // ===== EMPRESAS =====
+        function salvarEmpresas(empresas) {
+            _EMPRESAS = empresas;
+            localStorage.setItem('empresas_lbflorestal', JSON.stringify(empresas));
+        }
+
+        function obterEmpresas() {
+            return _EMPRESAS.length > 0 ? _EMPRESAS : JSON.parse(localStorage.getItem('empresas_lbflorestal') || '[]');
+        }
+
+        function adicionarEmpresa() {
+            const nome = document.getElementById('novaEmpresa').value;
+            const cnpj = document.getElementById('cnpjEmpresa').value;
+
+            if (!nome) {
+                alert('❌ Preencha o nome da empresa');
+                return;
+            }
+
+            const empresas = obterEmpresas();
+            if (empresas.find(e => e.nome.toUpperCase() === nome.toUpperCase())) {
+                alert('⚠️ Esta empresa já está cadastrada!');
+                return;
+            }
+
+            const _novaE={id: Date.now().toString(), nome, cnpj};
+            empresas.push(_novaE);
+            salvarEmpresas(empresas);
+            if(window.fbSalvarItem) fbSalvarItem('empresas', _novaE);
+            document.getElementById('novaEmpresa').value = '';
+            document.getElementById('cnpjEmpresa').value = '';
+            alert('✅ Empresa adicionada!');
+            renderizarEmpresas();
+            atualizarSelects();
+            atualizarFiltroEmpresa();
+        }
+
+        function deletarEmpresa(id) {
+            if (!confirm('Deletar empresa?')) return;
+            let empresas = obterEmpresas();
+            empresas = empresas.filter(e => e.id !== id);
+            salvarEmpresas(empresas);
+            if(window.fbDeletar) fbDeletar('empresas', id);
+            renderizarEmpresas();
+        }
+
+        function renderizarEmpresas() {
+            const empresas = obterEmpresas();
+            empresas.sort((a, b) => a.nome.toUpperCase().localeCompare(b.nome.toUpperCase()));
+            
+            const corpo = document.getElementById('corpoEmpresas');
+            
+            if (empresas.length === 0) {
+                corpo.innerHTML = '<tr><td colspan="3" class="no-data">Nenhuma empresa cadastrada</td></tr>';
+            } else {
+                corpo.innerHTML = empresas.map(e => `<tr>
+                    <td>${e.nome}</td>
+                    <td>${e.cnpj || '-'}</td>
+                    <td><button class="btn-small btn-delete" onclick="deletarEmpresa('${e.id}')">Deletar</button></td>
+                </tr>`).join('');
+            }
+        }
+
+        // ===== ARQUIVOS =====
+        function salvarArquivos(arquivos) {
+            localStorage.setItem('arquivos_lbflorestal', JSON.stringify(arquivos));
+        }
+
+        function obterArquivos() {
+            const dados = localStorage.getItem('arquivos_lbflorestal');
+            return dados ? JSON.parse(dados) : {};
+        }
+
+        function arquivarMes() {
+            const mesInput = document.getElementById('mesArquivar').value;
+            if (!mesInput) {
+                alert('❌ Selecione um mês!');
+                return;
+            }
+
+            const [ano, mes] = mesInput.split('-').map(Number);
+            const contas = obterContas();
+            
+            const contasParaArquivar = contas.filter(c => {
+                const dataVencimento = new Date(c.vencimento + 'T00:00:00');
+                return dataVencimento.getFullYear() === ano && 
+                       (dataVencimento.getMonth() + 1) === mes &&
+                       c.pago === true;
+            });
+
+            if (contasParaArquivar.length === 0) {
+                alert('❌ Nenhuma conta paga neste mês para arquivar!');
+                return;
+            }
+
+            const arquivos = obterArquivos();
+            const chave = `${ano}-${String(mes).padStart(2, '0')}`;
+            
+            arquivos[chave] = contasParaArquivar;
+            salvarArquivos(arquivos);
+
+            const contasRestantes = contas.filter(c => !contasParaArquivar.includes(c));
+            salvarContas(contasRestantes);
+
+            alert(`✅ ${contasParaArquivar.length} conta(s) arquivada(s)!`);
+            renderizarArquivos();
+            renderizarDashboard();
+        }
+
+        function renderizarArquivos() {
+            const arquivos = obterArquivos();
+            const corpo = document.getElementById('corpoArquivos');
+            
+            if (Object.keys(arquivos).length === 0) {
+                corpo.innerHTML = '<tr><td colspan="4" class="no-data">Nenhum mês arquivado</td></tr>';
+                return;
+            }
+
+            corpo.innerHTML = Object.entries(arquivos).reverse().map(([mes, contas]) => {
+                const total = contas.reduce((sum, c) => sum + c.valor, 0);
+                const mesFormatado = new Date(mes + '-15').toLocaleDateString('pt-BR', {month: 'long', year: 'numeric'});
+                return `<tr>
+                    <td>${mesFormatado}</td>
+                    <td>${contas.length}</td>
+                    <td class="currency">R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td>
+                        <button class="btn-small btn-pagar" onclick="restaurarMes('${mes}')">Restaurar</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function restaurarMes(mes) {
+            if (!confirm('Restaurar este mês? As contas voltarão à lista ativa.')) return;
+            
+            const arquivos = obterArquivos();
+            const contas = obterContas();
+            
+            contas.push(...arquivos[mes]);
+            salvarContas(contas);
+            
+            delete arquivos[mes];
+            salvarArquivos(arquivos);
+            
+            alert('✅ Mês restaurado!');
+            renderizarArquivos();
+            renderizarDashboard();
+        }
+
+        // ===== SINCRONIZAÇÃO =====
+        function exportarDados() {
+            const contas = obterContas();
+            const fornecedores = obterFornecedores();
+            const empresas = obterEmpresas();
+            const tipos = obterTipos();
+
+            const dados = {
+                versao: '2.2',
+                data_exportacao: new Date().toISOString(),
+                contas: contas,
+                fornecedores: fornecedores,
+                empresas: empresas,
+                tipos: tipos
+            };
+
+            const elemento = document.createElement('a');
+            elemento.setAttribute('href', 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(dados, null, 2)));
+            elemento.setAttribute('download', `contas_backup_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.json`);
+            elemento.style.display = 'none';
+            document.body.appendChild(elemento);
+            elemento.click();
+            document.body.removeChild(elemento);
+            alert('✅ Dados exportados com sucesso!');
+        }
+
+        function exportarExcel() {
+            const contas = obterContas();
+            const dados = contas.map(c => ({
+                'Vencimento': new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR'),
+                'Fornecedor': c.fornecedor,
+                'Tipo': c.tipo,
+                'NF': c.numeroNF,
+                'Valor': c.valor,
+                'Status': c.pago ? 'Pago' : 'Pendente'
+            }));
+
+            if (typeof XLSX !== 'undefined') {
+                const ws = XLSX.utils.json_to_sheet(dados);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Contas');
+                XLSX.writeFile(wb, `contas_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.xlsx`);
+                alert('✅ Excel exportado!');
+            } else {
+                alert('❌ Biblioteca XLSX não carregada');
+            }
+        }
+
+        function importarDados() {
+            const file = document.getElementById('importFile').files[0];
+            if (!file) {
+                alert('❌ Selecione um arquivo!');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    if (file.name.endsWith('.json')) {
+                        const dados = JSON.parse(e.target.result);
+                        
+                        let contasAdicionadas = 0;
+                        let tiposAdicionados = 0;
+                        let fornecedoresAdicionados = 0;
+                        let empresasAdicionadas = 0;
+                        
+                        if (dados.contas && Array.isArray(dados.contas)) {
+                            const contasAtuais = obterContas();
+                            dados.contas.forEach(novaConta => {
+                                const jáExiste = contasAtuais.find(c => 
+                                    c.fornecedor === novaConta.fornecedor && 
+                                    c.vencimento === novaConta.vencimento && 
+                                    c.valor === novaConta.valor &&
+                                    c.numeroNF === novaConta.numeroNF
+                                );
+                                if (!jáExiste) {
+                                    contasAtuais.push(novaConta);
+                                    contasAdicionadas++;
+                                }
+                            });
+
+                            // ✅ COMPLETAR PARCELAS FALTANTES
+                            // Agrupa por lote (fornecedor + NF + empresa + numeroParcelas)
+                            const lotes = {};
+                            contasAtuais.filter(c => c.parcelada === 'sim' && c.numeroParcelas > 1).forEach(c => {
+                                const chave = `${c.fornecedor}||${c.numeroNF}||${c.empresa}||${c.numeroParcelas}`;
+                                if (!lotes[chave]) lotes[chave] = [];
+                                lotes[chave].push(c);
+                            });
+
+                            Object.values(lotes).forEach(parcelas => {
+                                const total = parcelas[0].numeroParcelas;
+                                const numerosExistentes = parcelas.map(p => p.parcelaNumero);
+                                
+                                // Verificar se faltam parcelas
+                                for (let n = 1; n <= total; n++) {
+                                    if (!numerosExistentes.includes(n)) {
+                                        // Encontrar a parcela anterior para calcular a data
+                                        const anterior = parcelas.find(p => p.parcelaNumero === n - 1) || parcelas[0];
+                                        const dataAnterior = new Date(anterior.vencimento + 'T00:00:00');
+                                        const diffParcelas = n - anterior.parcelaNumero;
+                                        const novaData = new Date(dataAnterior.getTime() + diffParcelas * 30 * 24 * 60 * 60 * 1000);
+                                        
+                                        const idBase = anterior.id.split('_p')[0] || anterior.id;
+                                        const novaParcela = {
+                                            ...anterior,
+                                            id: idBase + '_p' + n,
+                                            vencimento: novaData.toISOString().split('T')[0],
+                                            parcelaNumero: n,
+                                            observacoes: (anterior.observacoes || '').replace(/\(Parcela \d+\/\d+\)/, `(Parcela ${n}/${total})`),
+                                            pago: false,
+                                            data_pagamento: null
+                                        };
+                                        contasAtuais.push(novaParcela);
+                                        contasAdicionadas++;
+                                    }
+                                }
+                            });
+
+                            salvarContas(contasAtuais);
+                        }
+                        
+                        if (dados.tipos && Array.isArray(dados.tipos)) {
+                            let tiposAtuais = obterTipos();
+                            dados.tipos.forEach(novoT => {
+                                const jáExiste = tiposAtuais.find(t => 
+                                    t.nome.toUpperCase().trim() === novoT.nome.toUpperCase().trim()
+                                );
+                                if (!jáExiste) {
+                                    tiposAtuais.push(novoT);
+                                    tiposAdicionados++;
+                                }
+                            });
+                            salvarTipos(tiposAtuais);
+                        }
+                        
+                        if (dados.fornecedores && Array.isArray(dados.fornecedores)) {
+                            let fornecedoresAtuais = obterFornecedores();
+                            dados.fornecedores.forEach(novoF => {
+                                const jáExiste = fornecedoresAtuais.find(f => 
+                                    f.nome.toUpperCase().trim() === novoF.nome.toUpperCase().trim()
+                                );
+                                if (!jáExiste && novoF.nome && novoF.nome.trim() !== '') {
+                                    fornecedoresAtuais.push(novoF);
+                                    fornecedoresAdicionados++;
+                                }
+                            });
+                            // Remover duplicatas antes de salvar
+                            const unique = [];
+                            fornecedoresAtuais.forEach(f => {
+                                if (!unique.find(u => u.nome.toUpperCase().trim() === f.nome.toUpperCase().trim())) {
+                                    unique.push(f);
+                                }
+                            });
+                            salvarFornecedores(unique);
+                        } else if (dados.contas && Array.isArray(dados.contas)) {
+                            let fornecedoresAtuais = obterFornecedores();
+                            const fornecedoresUnicos = [...new Set(dados.contas.map(c => c.fornecedor).filter(f => f))];
+                            fornecedoresUnicos.forEach(nomeFornecedor => {
+                                const jáExiste = fornecedoresAtuais.find(f => 
+                                    f.nome.toUpperCase().trim() === nomeFornecedor.toUpperCase().trim()
+                                );
+                                if (!jáExiste && nomeFornecedor.trim() !== '') {
+                                    fornecedoresAtuais.push({ id: Date.now().toString() + Math.random().toString(36).substr(2, 9), nome: nomeFornecedor, cnpj: '' });
+                                    fornecedoresAdicionados++;
+                                }
+                            });
+                            salvarFornecedores(fornecedoresAtuais);
+                        }
+                        
+                        if (dados.empresas && Array.isArray(dados.empresas)) {
+                            let empresasAtuais = obterEmpresas();
+                            dados.empresas.forEach(novaE => {
+                                const jáExiste = empresasAtuais.find(e => 
+                                    e.nome.toUpperCase().trim() === novaE.nome.toUpperCase().trim()
+                                );
+                                if (!jáExiste) {
+                                    empresasAtuais.push(novaE);
+                                    empresasAdicionadas++;
+                                }
+                            });
+                            salvarEmpresas(empresasAtuais);
+                        } else if (dados.contas && Array.isArray(dados.contas)) {
+                            let empresasAtuais = obterEmpresas();
+                            const empresasUnicas = [...new Set(dados.contas.map(c => c.empresa).filter(e => e))];
+                            empresasUnicas.forEach(nomeEmpresa => {
+                                const jáExiste = empresasAtuais.find(e => 
+                                    e.nome.toUpperCase().trim() === nomeEmpresa.toUpperCase().trim()
+                                );
+                                if (!jáExiste && nomeEmpresa.trim() !== '') {
+                                    empresasAtuais.push({ id: Date.now().toString() + Math.random().toString(36).substr(2, 9), nome: nomeEmpresa, cnpj: '' });
+                                    empresasAdicionadas++;
+                                }
+                            });
+                            salvarEmpresas(empresasAtuais);
+                        }
+
+                        let mensagem = '✅ DADOS IMPORTADOS:\n\n';
+                        if (contasAdicionadas > 0) mensagem += `📦 Contas adicionadas: ${contasAdicionadas}\n`;
+                        if (tiposAdicionados > 0) mensagem += `🏷️ Tipos adicionados: ${tiposAdicionados}\n`;
+                        if (fornecedoresAdicionados > 0) mensagem += `🏢 Fornecedores adicionados: ${fornecedoresAdicionados}\n`;
+                        if (empresasAdicionadas > 0) mensagem += `🏭 Empresas adicionadas: ${empresasAdicionadas}\n`;
+                        
+                        if (contasAdicionadas === 0 && tiposAdicionados === 0 && fornecedoresAdicionados === 0 && empresasAdicionadas === 0) {
+                            mensagem = '⚠️ Nenhum dado novo foi adicionado (possível duplicata ou estrutura diferente)';
+                        }
+                        
+                        mensagem += '\n\n💡 Verifique a aba de Fornecedores e Empresas!';
+                        
+                        alert(mensagem);
+                        renderizarDashboard();
+                        atualizarSelects();
+                        atualizarFiltroEmpresa();
+                        renderizarTipos();
+                        renderizarFornecedores();
+                        renderizarEmpresas();
+                    } else {
+                        alert('❌ Arquivo deve ser JSON!');
+                    }
+                } catch (err) {
+                    alert('❌ Erro ao importar: ' + err.message);
+                    console.error('ERRO DETALHADO:', err);
+                }
+                document.getElementById('importFile').value = '';
+            };
+
+            reader.readAsText(file);
+        }
+
+        function deletarDuplicados() {
+            let contasDuplicadas = 0;
+            let duplicadosTipos = 0;
+            let duplicadosFornecedores = 0;
+            let duplicadosEmpresas = 0;
+
+            const contas = obterContas();
+            const contasUnicas = [];
+            contas.forEach(conta => {
+                if (!contasUnicas.find(c => c.fornecedor === conta.fornecedor && c.vencimento === conta.vencimento && c.valor === conta.valor)) {
+                    contasUnicas.push(conta);
+                } else {
+                    contasDuplicadas++;
+                }
+            });
+            salvarContas(contasUnicas);
+            
+            let tipos = obterTipos();
+            let tiposUnicos = [];
+            tipos.forEach(t => {
+                if (!tiposUnicos.find(tu => tu.nome.toUpperCase().trim() === t.nome.toUpperCase().trim())) {
+                    tiposUnicos.push(t);
+                } else {
+                    duplicadosTipos++;
+                }
+            });
+            salvarTipos(tiposUnicos);
+            
+            let fornecedores = obterFornecedores();
+            let fornecedoresUnicos = [];
+            fornecedores.forEach(f => {
+                if (!fornecedoresUnicos.find(fu => fu.nome.toUpperCase().trim() === f.nome.toUpperCase().trim() && fu.cnpj === f.cnpj)) {
+                    fornecedoresUnicos.push(f);
+                } else {
+                    duplicadosFornecedores++;
+                }
+            });
+            salvarFornecedores(fornecedoresUnicos);
+            
+            let empresas = obterEmpresas();
+            let empresasUnicas = [];
+            empresas.forEach(e => {
+                if (!empresasUnicas.find(eu => eu.nome.toUpperCase().trim() === e.nome.toUpperCase().trim() && eu.cnpj === e.cnpj)) {
+                    empresasUnicas.push(e);
+                } else {
+                    duplicadosEmpresas++;
+                }
+            });
+            salvarEmpresas(empresasUnicas);
+            
+            const totalDuplicados = contasDuplicadas + duplicadosTipos + duplicadosFornecedores + duplicadosEmpresas;
+            
+            if (totalDuplicados === 0) {
+                alert('✅ Sem duplicatas encontradas!');
+            } else {
+                let mensagem = '✅ DUPLICATAS REMOVIDAS:\n\n';
+                if (duplicadosTipos > 0) mensagem += `🏷️ Tipos: ${duplicadosTipos}\n`;
+                if (duplicadosFornecedores > 0) mensagem += `🏢 Fornecedores: ${duplicadosFornecedores}\n`;
+                if (duplicadosEmpresas > 0) mensagem += `🏭 Empresas: ${duplicadosEmpresas}\n`;
+                if (contasDuplicadas > 0) mensagem += `📦 Contas: ${contasDuplicadas}\n`;
+                mensagem += `\n✨ Total: ${totalDuplicados} item(ns) removido(s)`;
+                alert(mensagem);
+            }
+            
+            renderizarDashboard();
+            renderizarTipos();
+            renderizarFornecedores();
+            renderizarEmpresas();
+            consultarContas();
+        }
+
+        function limparDados() {
+            if (!confirm('⚠️ CUIDADO! Isso vai deletar TODOS os dados. Tem certeza?')) return;
+            localStorage.removeItem('contas_lbflorestal');
+            alert('🗑️ Todos os dados foram deletados!');
+            renderizarDashboard();
+        }
+
+        function atualizarStatusSync() {
+            const contas = obterContas();
+            const totalContas = contas.length;
+            const totalValor = contas.reduce((sum, c) => sum + c.valor, 0);
+            
+            document.getElementById('statusDados').innerHTML = `
+                <strong>📊 Status dos Dados:</strong><br>
+                Total de contas: ${totalContas}<br>
+                Valor total: R$ ${totalValor.toLocaleString('pt-BR', {minimumFractionDigits: 2})}<br>
+                Última modificação: ${new Date().toLocaleString('pt-BR')}<br><br>
+                <strong>✅ VERSÃO 2.2</strong><br>
+                Edição de parcelas: altere uma ou todas as parcelas do lote!
+            `;
+        }
+
+        function atualizarSelects() {
+            const tipos = obterTipos();
+            const empresas = obterEmpresas();
+            const fornecedores = obterFornecedores();
+
+            const selectTipo = document.getElementById('tipo');
+            const tiposOrdenados = [...tipos].sort((a, b) => a.nome.toUpperCase().localeCompare(b.nome.toUpperCase()));
+            selectTipo.innerHTML = '<option value="">Selecione...</option>' + 
+                tiposOrdenados.map(t => `<option value="${t.nome}">${t.nome}</option>`).join('');
+
+            const selectEmpresa = document.getElementById('selectEmpresa');
+            const empresasOrdenadas = [...empresas].sort((a, b) => a.nome.toUpperCase().localeCompare(b.nome.toUpperCase()));
+            selectEmpresa.innerHTML = '<option value="">Selecione...</option>' + 
+                empresasOrdenadas.map(e => `<option value="${e.nome}">${e.nome}</option>`).join('');
+
+            const selectFornecedor = document.getElementById('selectFornecedor');
+            const fornecedoresOrdenados = [...fornecedores].sort((a, b) => a.nome.toUpperCase().localeCompare(b.nome.toUpperCase()));
+            selectFornecedor.innerHTML = '<option value="">Selecione...</option>' + 
+                fornecedoresOrdenados.map(f => `<option value="${f.nome}">${f.nome}</option>`).join('');
+        }
+
+        function fecharModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        window.onclick = (event) => {
+            if (event.target.classList.contains('modal')) event.target.style.display = 'none';
+        };
+
+        // Inicializar
+        renderizarDashboard();
+        atualizarSelects();
+        atualizarFiltroEmpresa();
+        renderizarTipos();
+        renderizarFornecedores();
+        renderizarEmpresas();
+        renderizarArquivos();
+
+        // ===== IMPRIMIR FILTRADO =====
+        function imprimirConsultaFiltrada() {
+            const corpo = document.getElementById('corpoContas');
+            const linhas = corpo.querySelectorAll('tr');
+            
+            if (linhas.length === 0 || (linhas.length === 1 && linhas[0].textContent.includes('Clique em Filtrar'))) {
+                alert('⚠️ Nenhuma conta para imprimir! Clique em "Filtrar" primeiro.');
+                return;
+            }
+
+            let html = `<html><head><title>Consulta Filtrada - LB Florestal</title><style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background: #667eea; color: white; font-weight: bold; }
+                .total-row { font-weight: bold; background: #f0f0f0; }
+                h1 { text-align: center; }
+                .data { text-align: center; color: #666; margin-bottom: 20px; }
+                .currency { text-align: right; }
+            </style></head><body>
+                <h1>💼 LB Florestal - Consulta Filtrada</h1>
+                <div class="data">Emitido em: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}</div>
+                <table>
+                    <thead><tr>
+                        <th>Vencimento</th>
+                        <th>Empresa</th>
+                        <th>Fornecedor</th>
+                        <th>Tipo</th>
+                        <th>NF</th>
+                        <th>Valor</th>
+                        <th>Parcelas</th>
+                        <th>Status</th>
+                        <th>Data Pagamento</th>
+                        <th>Observações</th>
+                    </tr></thead>
+                    <tbody>`;
+
+            let totalGeral = 0;
+            linhas.forEach(linha => {
+                if (!linha.classList.contains('total-row') && !linha.textContent.includes('Clique em Filtrar')) {
+                    const cells = linha.querySelectorAll('td');
+                    if (cells.length >= 10) {
+                        html += '<tr>';
+                        for (let i = 0; i < 10; i++) {
+                            html += `<td>${cells[i].textContent.trim()}</td>`;
+                        }
+                        html += '</tr>';
+                        
+                        const valor = parseFloat(cells[5].textContent.replace(/[^\d,]/g, '').replace(',', '.'));
+                        if (!isNaN(valor)) totalGeral += valor;
+                    }
+                }
+            });
+
+            html += `<tr class="total-row">
+                <td colspan="5">TOTAL</td>
+                <td class="currency">R$ ${totalGeral.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                <td colspan="4"></td>
+            </tr></tbody></table></body></html>`;
+
+            const janela = window.open('', '', 'width=1200,height=700');
+            janela.document.write(html);
+            janela.document.close();
+            setTimeout(() => janela.print(), 500);
+        }
+
+        function gerarPDFConsultaFiltrada() {
+            const corpo = document.getElementById('corpoContas');
+            const linhas = corpo.querySelectorAll('tr');
+            
+            if (linhas.length === 0 || (linhas.length === 1 && linhas[0].textContent.includes('Clique em Filtrar'))) {
+                alert('⚠️ Nenhuma conta para gerar PDF! Clique em "Filtrar" primeiro.');
+                return;
+            }
+
+            const dados = [];
+            let totalGeral = 0;
+            
+            linhas.forEach(linha => {
+                if (!linha.classList.contains('total-row') && !linha.textContent.includes('Clique em Filtrar')) {
+                    const cells = linha.querySelectorAll('td');
+                    if (cells.length >= 10) {
+                        dados.push([
+                            cells[0].textContent.trim(),
+                            cells[1].textContent.trim(),
+                            cells[2].textContent.trim(),
+                            cells[3].textContent.trim(),
+                            cells[4].textContent.trim(),
+                            cells[5].textContent.trim(),
+                            cells[6].textContent.trim(),
+                            cells[7].textContent.trim()
+                        ]);
+                        
+                        const valor = parseFloat(cells[5].textContent.replace(/[^\d,]/g, '').replace(',', '.'));
+                        if (!isNaN(valor)) totalGeral += valor;
+                    }
+                }
+            });
+
+            const docDef = {
+                content: [
+                    { text: '💼 LB FLORESTAL - CONSULTA FILTRADA', style: 'header' },
+                    { text: `Emitido em: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}`, style: 'subheader' },
+                    {
+                        table: {
+                            headerRows: 1,
+                            widths: ['10%', '12%', '18%', '12%', '8%', '12%', '10%', '12%'],
+                            body: [
+                                [
+                                    { text: 'Vencimento', style: 'tableHeader' },
+                                    { text: 'Empresa', style: 'tableHeader' },
+                                    { text: 'Fornecedor', style: 'tableHeader' },
+                                    { text: 'Tipo', style: 'tableHeader' },
+                                    { text: 'NF', style: 'tableHeader' },
+                                    { text: 'Valor', style: 'tableHeader' },
+                                    { text: 'Parcelas', style: 'tableHeader' },
+                                    { text: 'Status', style: 'tableHeader' }
+                                ],
+                                ...dados,
+                                [
+                                    { text: 'TOTAL', colSpan: 5, style: 'tableFooter' },
+                                    { text: `R$ ${totalGeral.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, style: 'tableFooter' },
+                                    {},
+                                    {}
+                                ]
+                            ]
+                        }
+                    }
+                ],
+                styles: {
+                    header: { fontSize: 16, bold: true, alignment: 'center', margin: [0, 0, 0, 10] },
+                    subheader: { fontSize: 10, alignment: 'center', margin: [0, 0, 0, 10], color: '#666' },
+                    tableHeader: { bold: true, color: 'white', fillColor: '#667eea', alignment: 'center' },
+                    tableFooter: { bold: true, fillColor: '#f0f0f0', alignment: 'right' }
+                }
+            };
+
+            pdfMake.createPdf(docDef).download(`consulta_filtrada_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.pdf`);
+        }
+
+        // ===== EDITAR FORNECEDOR =====
+        function abrirModalEditarFornecedor(id) {
+            const fornecedores = obterFornecedores();
+            const fornecedor = fornecedores.find(f => f.id === id);
+            
+            if (fornecedor) {
+                document.getElementById('editarNomeFornecedor').value = fornecedor.nome || '';
+                document.getElementById('editarCNPJFornecedor').value = fornecedor.cnpj || '';
+                document.getElementById('idFornecedorEditar').value = id;
+                document.getElementById('modalEditarFornecedor').style.display = 'block';
+            }
+        }
+
+        function salvarEdicaoFornecedor(event) {
+            event.preventDefault();
+            
+            const id = document.getElementById('idFornecedorEditar').value;
+            const novoNome = document.getElementById('editarNomeFornecedor').value.trim();
+            const novoCNPJ = document.getElementById('editarCNPJFornecedor').value.trim();
+            
+            if (!novoNome) {
+                alert('❌ Nome do fornecedor é obrigatório!');
+                return;
+            }
+            
+            let fornecedores = obterFornecedores();
+            const fornecedor = fornecedores.find(f => f.id === id);
+            
+            if (!fornecedor) return;
+
+            const nomeAntigo = fornecedor.nome;
+
+            // Verificar se o nome mudou
+            if (nomeAntigo.toUpperCase().trim() !== novoNome.toUpperCase().trim()) {
+                // Contar quantas contas serão afetadas
+                const contas = obterContas();
+                const contasAfetadas = contas.filter(c => c.fornecedor === nomeAntigo);
+
+                if (contasAfetadas.length > 0) {
+                    const atualizar = confirm(
+                        `O fornecedor foi renomeado de:\n"${nomeAntigo}" → "${novoNome}"\n\n` +
+                        `Existem ${contasAfetadas.length} conta(s) vinculada(s) ao nome antigo.\n\n` +
+                        `✅ OK = Atualizar o nome também nas contas\n` +
+                        `❌ Cancelar = Alterar só o cadastro`
+                    );
+
+                    if (atualizar) {
+                        contasAfetadas.forEach(c => c.fornecedor = novoNome);
+                        salvarContas(contas);
+                    }
+                }
+            }
+
+            fornecedor.nome = novoNome;
+            fornecedor.cnpj = novoCNPJ;
+            salvarFornecedores(fornecedores);
+            if(window.fbSalvarItem) fbSalvarItem('fornecedores', fornecedor);
+            alert('✅ Fornecedor editado com sucesso!');
+            fecharModal('modalEditarFornecedor');
+            renderizarFornecedores();
+            atualizarSelects();
+            atualizarFiltroEmpresa();
+            consultarContas();
+        }
+    </script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script>
+    (function(){
+        firebase.initializeApp({
+            apiKey:"AIzaSyCnEXvGijF7ymwhSbJ6fVXScW-rFq10sFE",
+            authDomain:"contas-lb-florestal.firebaseapp.com",
+            projectId:"contas-lb-florestal",
+            storageBucket:"contas-lb-florestal.firebasestorage.app",
+            messagingSenderId:"567451880189",
+            appId:"1:567451880189:web:103125185aea74fe750c94"
+        });
+        var db = firebase.firestore();
+        var FB_CHAVES = {
+            contas:'contas_lbflorestal',
+            fornecedores:'fornecedores_lbflorestal',
+            empresas:'empresas_lbflorestal',
+            tipos:'tipos_lbflorestal'
+        };
+
+        function setStatus(msg, cor) {
+            var el = document.getElementById('statusFirebase');
+            if (el) { el.textContent = msg; el.style.color = cor || '#fff'; }
+        }
+
+        function reRender() {
+            var n = obterContas().length;
+            setStatus('Conectado (' + n + ' contas)', '#4CAF50');
+            renderizarDashboard();
+            atualizarSelects();
+            atualizarFiltroEmpresa();
+            renderizarTipos();
+            renderizarFornecedores();
+            renderizarEmpresas();
+            renderizarArquivos();
+        }
+
+        // Salvar item individual
+        window.fbSalvarItem = function(col, item) {
+            db.collection(col).doc(String(item.id)).set(item)
+              .catch(function(e){ console.error('fbSalvarItem erro:', col, e); });
+        };
+
+        // Deletar item individual
+        window.fbDeletar = function(col, id) {
+            db.collection(col).doc(String(id)).delete()
+              .catch(function(e){ console.error('fbDeletar erro:', col, e); });
+        };
+
+        // Sincronizar manual
+        window.fbCarregar = function() {
+            setStatus('Sincronizando...', '#FFC107');
+            var cols = Object.keys(FB_CHAVES);
+            var done = 0;
+            cols.forEach(function(col) {
+                db.collection(col).get().then(function(snap) {
+                    var items = [];
+                    snap.forEach(function(d){ items.push(d.data()); });
+                    if (col === 'contas') _CONTAS = items;
+                    if (col === 'fornecedores') _FORNECEDORES = items;
+                    if (col === 'empresas') _EMPRESAS = items;
+                    if (col === 'tipos') _TIPOS = items;
+                    localStorage.setItem(FB_CHAVES[col], JSON.stringify(items));
+                    done++;
+                    if (done === cols.length) { reRender(); }
+                }).catch(function(e){
+                    setStatus('Erro Firebase', '#F44336');
+                    console.error('fbCarregar erro:', col, e);
+                });
+            });
+        };
+
+        // Carregar dados uma vez - sem onSnapshot para economizar cota
+        function iniciarListeners() {
+            window.fbCarregar();
+        }
+
+        window.addEventListener('load', function(){
+            setTimeout(iniciarListeners, 500);
+        });
+    })();
+    </script>
+</body>
+</html>
